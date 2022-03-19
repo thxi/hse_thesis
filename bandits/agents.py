@@ -1,7 +1,8 @@
-from collections import defaultdict
-from bandits.bandits import Bandit
 from abc import ABC, abstractmethod
+
 import numpy as np
+
+from bandits.bandits import Bandit
 
 # some code is taken from
 # https://towardsdatascience.com/multi-armed-bandits-upper-confidence-bound-algorithms-with-python-code-a977728f0e2d
