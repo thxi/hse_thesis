@@ -9,7 +9,6 @@ packages = [
 
 [tool.poetry.dependencies]
 python = ">=3.9,<3.11"
-bandits = { path = "bandits/", develop = false }
 numpy = "^1.22.3"
 pandas = "^1.4.1"
 matplotlib = "^3.5.1"
