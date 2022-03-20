@@ -55,9 +55,10 @@ class EpsilonGreedyAgent(Agent):
 
 
 class UCB1Agent(Agent):
-    def __init__(self, bandit: Bandit, alpha=1):
+    def __init__(self, bandit: Bandit, alpha=1, reward_normalization=1):
         self.bandit = bandit
         self.alpha = alpha
+        self.reward_normalization = reward_normalization
 
         self.reset()
 
@@ -75,7 +76,7 @@ class UCB1Agent(Agent):
 
     def take_action(self):
         k = self._choose_bandit()
-        reward = self.bandit.pull(k)
+        reward = self.bandit.pull(k) / self.reward_normalization
         self._update_rewards(k=k, reward=reward)
         self.explored_bandits += 1
         self.t += 1
