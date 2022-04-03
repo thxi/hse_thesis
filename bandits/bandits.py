@@ -1,25 +1,30 @@
-from abc import ABC, abstractmethod
-
 import numpy as np
+from gym import Env, spaces
 
 
-class Bandit(ABC):
-    @abstractmethod
-    def pull(self):
-        pass
-
-    @abstractmethod
-    def num_arms(self):
-        pass
-
-
-class BernoulliBandit(Bandit):
+class BernoulliBanditEnv(Env):
     def __init__(self, probs):
-        super().__init__()
+        super(BernoulliBanditEnv, self).__init__()
+
         self.probs = probs
 
-    def pull(self, k):
-        return np.random.binomial(1, self.probs[k])
+        self.action_space = spaces.Discrete(len(probs))
+        self.observation_space = spaces.Discrete(1)  # no observations, only rewards
 
-    def num_arms(self):
-        return len(self.probs)
+        self.max_reward = np.max(self.probs)
+
+    def step(self, action):
+        assert self.action_space.contains(action)
+
+        observation = 0
+        reward = np.random.binomial(1, self.probs[action])
+        done = False
+        info = None
+        return observation, reward, done, info
+
+    def reset(self):
+        return 0
+
+
+# TODO: maybe register environment
+# https://sjcaldwell.github.io/2020/05/21/openai-gym-intro.html
