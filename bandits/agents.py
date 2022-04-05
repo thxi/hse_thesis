@@ -51,9 +51,10 @@ class EpsilonGreedyAgent(Agent):
 
 
 class UCB1Agent(Agent):
-    def __init__(self, num_arms, alpha=1):
+    def __init__(self, num_arms, alpha=1, reward_normalization=1):
         self.num_arms = num_arms
         self.alpha = alpha
+        self.reward_normalization = reward_normalization
 
         self.reset()
 
@@ -74,6 +75,7 @@ class UCB1Agent(Agent):
         return action
 
     def update_estimates(self, action, observation, reward):
+        reward = reward / self.reward_normalization
         old_mean_reward = self.arm_to_mean_rewards[action]
         old_count = self.arm_to_num_pulls[action]
         new_mean_reward = (old_mean_reward * old_count + reward) / (old_count + 1)
