@@ -2,6 +2,7 @@ from ctypes import ArgumentError
 import numpy as np
 
 from bandits.agents import Agent
+from bandits.slr import SimpleLinearRegressor
 
 
 class UCB1OAgent(Agent):
@@ -14,8 +15,8 @@ class UCB1OAgent(Agent):
 
     def _calc_ucb_range(self, j, i):
         # a helper to calculate the ucb in range j..i including j and i
-        T_ji = np.sum(self.bandit_to_num_pulls[j : i + 1])
-        X_ji = np.sum((self.bandit_to_mean_conversion[j : i + 1] * self.bandit_to_num_pulls[j : i + 1])) / T_ji
+        T_ji = np.sum(self.arm_to_num_pulls[j : i + 1])
+        X_ji = np.sum((self.arm_to_mean_conversion[j : i + 1] * self.arm_to_num_pulls[j : i + 1])) / T_ji
         return X_ji + np.sqrt(2 * np.log(self.t) / T_ji)
 
     def _choose_arm(self):
@@ -50,19 +51,76 @@ class UCB1OAgent(Agent):
             raise ArgumentError("price is zero")
         conversion = reward / price
 
-        old_mean_conversion = self.bandit_to_mean_conversion[action]
-        old_count = self.bandit_to_num_pulls[action]
+        old_mean_conversion = self.arm_to_mean_conversion[action]
+        old_count = self.arm_to_num_pulls[action]
         new_mean_conversion = (old_mean_conversion * old_count + conversion) / (old_count + 1)
 
-        self.bandit_to_mean_conversion[action] = new_mean_conversion
-        self.bandit_to_num_pulls[action] = old_count + 1
+        self.arm_to_mean_conversion[action] = new_mean_conversion
+        self.arm_to_num_pulls[action] = old_count + 1
 
         self.explored_bandits += 1
         self.t += 1
 
     def reset(self):
-        self.bandit_to_mean_conversion = np.zeros(self.num_arms)
-        self.bandit_to_num_pulls = np.zeros(self.num_arms)
+        self.arm_to_mean_conversion = np.zeros(self.num_arms)
+        self.arm_to_num_pulls = np.zeros(self.num_arms)
+
+        # firstly, we should explore all bandit arms
+        # so explored_bandits shows the number of bandits we explored so far
+        self.explored_bandits = 0
+        self.t = 0  # current round
+
+
+class SLRAgent(Agent):
+    def __init__(self, action_to_price, alpha=1):
+        self.alpha = alpha
+        self.action_to_price = action_to_price
+        self.num_arms = len(action_to_price)
+        self.slr = SimpleLinearRegressor()
+
+        self.reset()
+
+    def _choose_arm(self):
+        if self.explored_bandits < self.num_arms:
+            # not finished exploration phase
+            k = self.explored_bandits
+            return k
+
+        estimated_quantities = self.slr.predict(x=np.array(self.action_to_price))
+        means = self.action_to_price * estimated_quantities
+        upper = np.sqrt(2 * np.log(self.t + 1) / (self.arm_to_num_pulls) + 1)
+        k = np.argmax(means + self.alpha * upper)
+        # print(f"{means=}")
+        # print(f"{estimated_quantities=}")
+        # print(f"{self.arm_to_num_pulls=}")
+        # print()
+        return k
+
+    def get_action(self, observation):
+        action = self._choose_arm()
+        return action
+
+    def update_estimates(self, action, observation, reward):
+        price = self.action_to_price[action]
+        if price == 0:
+            raise ArgumentError("price is zero")
+        conversion = reward / price
+
+        self.history_prices.append(price)
+        self.history_quantities.append(conversion)
+        # TODO: numpy conversion might be inefficient
+        # change python list to numpy arrays initially
+        self.slr.update(x=np.array(self.history_prices), y=np.array(self.history_quantities))
+
+        self.arm_to_num_pulls[action] += 1
+
+        self.explored_bandits += 1
+        self.t += 1
+
+    def reset(self):
+        self.history_prices = []
+        self.history_quantities = []
+        self.arm_to_num_pulls = np.zeros(self.num_arms)
 
         # firstly, we should explore all bandit arms
         # so explored_bandits shows the number of bandits we explored so far
