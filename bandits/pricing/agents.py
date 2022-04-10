@@ -110,7 +110,7 @@ class SLRAgent(Agent):
         self.history_quantities.append(conversion)
         # TODO: numpy conversion might be inefficient
         # change python list to numpy arrays initially
-        self.slr.update(x=np.array(self.history_prices), y=np.array(self.history_quantities))
+        self.slr.update(x=np.array([price]), y=np.array([conversion]))
 
         self.arm_to_num_pulls[action] += 1
 

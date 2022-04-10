@@ -7,7 +7,7 @@ jupyter:
 lab:
 	jupyter-lab --ip='*' --NotebookApp.token='' --NotebookApp.password='' --no-browser
 
-data: data/m5 data/brazil
+data: data/m5 data/brazil data/avocado
 
 data/m5: FORCE
 	mkdir -p data/m5
@@ -18,5 +18,10 @@ data/brazil: FORCE
 	mkdir -p data/brazil
 	cd data/brazil && kaggle datasets download -d olistbr/brazilian-ecommerce
 	cd data/brazil && unzip -o brazilian-ecommerce.zip
+
+data/avocado: FORCE
+	mkdir -p data/avocado
+	cd data/avocado && kaggle datasets download -d neuromusic/avocado-prices
+	cd data/avocado && unzip -o avocado-prices.zip
 
 FORCE: ;

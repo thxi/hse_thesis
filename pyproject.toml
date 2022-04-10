@@ -22,6 +22,9 @@ jupyter-contrib-nbextensions = "^0.5.1"
 jupyter_nbextensions_configurator = "^0.4.1"
 jupyterlab-execute-time = "^2.1.0"
 gym = "^0.23.1"
+lightgbm = "^3.3.2"
+optuna = "^2.10.0"
+plotly = "^5.7.0"
 
 [tool.poetry.dev-dependencies]
 black = "^22.1.0"
