@@ -1,3 +1,12 @@
+- [What is it about?](#what-is-it-about)
+- [Directory structure](#directory-structure)
+- [Installation](#installation)
+- [Datasets](#datasets)
+
+## What is it about?
+
+This is code for my thesis.
+
 ## Directory structure
 
 - `bandits` - the main python package
@@ -23,7 +32,7 @@ To run a virtual environment with the installed packages:
 poetry shell
 ```
 
-## Datasets:
+## Datasets
 
 - sugar demand dataset is taken from https://users.stat.ufl.edu/~winner/data/
 - Brazillian e-commerce https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce
