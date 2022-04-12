@@ -2,7 +2,7 @@ from ctypes import ArgumentError
 import numpy as np
 
 from bandits.agents import Agent
-from bandits.slr import SimpleLinearRegressor
+from bandits.online_models import SimpleLinearRegressor
 
 
 class UCB1OAgent(Agent):
