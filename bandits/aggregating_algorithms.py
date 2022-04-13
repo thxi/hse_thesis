@@ -10,41 +10,38 @@ class AggregatingAlgorithm(ABC):
     def __init__(self, models: List[OnlineModel]):
         self.models = models
         self.num_models = len(models)
-        self.previous_x = None
         self.previous_predictions = None
 
-    def get_prediction(self, x: float):
-        x = np.array([x])
-        self.previous_x = x
+    def get_prediction(self, x: np.ndarray) -> float:
+        # x shape is (n_observations,)
 
         all_predictions = []
         for model in self.models:
-            model_predictions = model.predict(x)[0]
+            model_predictions = model.predict(x)
             all_predictions.append(model_predictions)
-        all_predictions = np.array(all_predictions)
-        final_prediction = self._get_final_prediction(all_predictions)
-
+        all_predictions = np.array(all_predictions).T  # shape=(n_observations, num_models)
         self.previous_predictions = all_predictions
+
+        final_prediction = self._get_final_prediction(all_predictions)
         return final_prediction
 
     @abstractmethod
     def _get_final_prediction(self, all_predictions: np.ndarray):
-        # all_predictions shape is (num_models,)
+        # all_predictions shape=(n_observations, num_models)
         pass
 
-    def update_estimates(self, true_value):
-        self._update_models(true_value)
-        # update each agent
-        self._update_weights(true_value)
-        pass
+    def update_estimates(self, x: np.ndarray, y: np.ndarray):
+        # x shape=(n_observations,)
+        self._update_models(x, y)
+        self._update_weights(x, y)
 
-    def _update_models(self, true_value):
+    def _update_models(self, x: np.ndarray, y: np.ndarray):
         # update each model
         for model in self.models:
-            model.update(x=self.previous_x, y=np.array([true_value]))
+            model.update(x, y)
 
     @abstractmethod
-    def _update_weights(self, true_value):
+    def _update_weights(self, x: np.ndarray, y: np.ndarray):
         # update the weights of each model in aggregate prediction
         pass
 
@@ -55,10 +52,10 @@ class SimpleMeanAggregatingAlgorithm(AggregatingAlgorithm):
         super().__init__(models)
 
     def _get_final_prediction(self, all_predictions: np.ndarray):
-        final_prediction = np.mean(all_predictions)
+        final_prediction = np.mean(all_predictions, axis=1)
         return final_prediction
 
-    def _update_weights(self, true_value):
+    def _update_weights(self, x: np.ndarray, y: np.ndarray):
         pass
 
 
@@ -76,13 +73,11 @@ class Hedge(AggregatingAlgorithm):
         self.weights_history = []
 
     def _get_final_prediction(self, all_predictions: np.ndarray):
-        final_prediction = np.sum(all_predictions * self.weights)
+        final_prediction = all_predictions.dot(self.weights)
         self.weights_history.append(self.weights)
         return final_prediction
 
-    def _update_weights(self, true_value):
-        # print(self.previous_predictions, true_value)
-        losses = self.loss_func(self.previous_predictions, np.repeat(true_value, self.num_models))
-        # print(losses)
+    def _update_weights(self, x: np.ndarray, y: np.ndarray):
+        losses = np.sum(np.apply_along_axis(lambda x: self.loss_func(x, y), 0, self.previous_predictions), axis=0)
         self.weights = self.weights * np.exp(-self.eta * losses)
         self.weights = self.weights / np.sum(self.weights)

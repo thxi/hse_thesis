@@ -2,6 +2,7 @@ from ctypes import ArgumentError
 import numpy as np
 
 from bandits.agents import Agent
+from bandits.aggregating_algorithms import AggregatingAlgorithm
 from bandits.online_models import SimpleLinearRegressor
 
 
@@ -87,6 +88,71 @@ class SLRAgent(Agent):
             return k
 
         estimated_quantities = self.slr.predict(x=np.array(self.action_to_price))
+        means = self.action_to_price * estimated_quantities
+        upper = np.sqrt(2 * np.log(self.t + 1) / (self.arm_to_num_pulls) + 1)
+        k = np.argmax(means + self.alpha * upper)
+        # print(f"{means=}")
+        # print(f"{estimated_quantities=}")
+        # print(f"{self.arm_to_num_pulls=}")
+        # print()
+        return k
+
+    def get_action(self, observation):
+        action = self._choose_arm()
+        return action
+
+    def update_estimates(self, action, observation, reward):
+        price = self.action_to_price[action]
+        if price == 0:
+            raise ArgumentError("price is zero")
+        conversion = reward / price
+
+        self.history_prices.append(price)
+        self.history_quantities.append(conversion)
+        # TODO: numpy conversion might be inefficient
+        # change python list to numpy arrays initially
+        self.slr.update(x=np.array([price]), y=np.array([conversion]))
+
+        self.arm_to_num_pulls[action] += 1
+
+        self.explored_bandits += 1
+        self.t += 1
+
+    def reset(self):
+        self.history_prices = []
+        self.history_quantities = []
+        self.arm_to_num_pulls = np.zeros(self.num_arms)
+
+        # firstly, we should explore all bandit arms
+        # so explored_bandits shows the number of bandits we explored so far
+        self.explored_bandits = 0
+        self.t = 0  # current round
+
+
+class AggregatingAgent(Agent):
+    def __init__(
+        self,
+        action_to_price,
+        aggregating_algorithm: AggregatingAlgorithm,
+        alpha=1,
+    ):
+        self.alpha = alpha
+        self.action_to_price = action_to_price
+        self.num_arms = len(action_to_price)
+        self.aggregating_algorithm = aggregating_algorithm
+
+        self.reset()
+
+    def _choose_arm(self):
+        if self.explored_bandits < self.num_arms:
+            # not finished exploration phase
+            k = self.explored_bandits
+            return k
+
+        # estimated_quantities = self.slr.predict(x=np.array(self.action_to_price))
+        # TODO: should predict multiple values in agg algorithm
+        # pass x to update_estimates
+        # estimated_quantities =
         means = self.action_to_price * estimated_quantities
         upper = np.sqrt(2 * np.log(self.t + 1) / (self.arm_to_num_pulls) + 1)
         k = np.argmax(means + self.alpha * upper)

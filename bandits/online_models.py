@@ -27,14 +27,26 @@ class ConstantModel(OnlineModel):
 
 
 class SimpleLinearRegressor(OnlineModel):
-    def __init__(self, intercept=None, slope=None):
+    def __init__(
+        self,
+        intercept=None,
+        slope=None,
+        x_transform=lambda x: x,
+        y_transform=lambda y: y,
+        y_inv_transform=lambda y: y,
+    ):
         self.dots = np.zeros(5)
         self.intercept = intercept
         self.slope = slope
+        self.x_transform = x_transform
+        self.y_transform = y_transform
+        self.y_inv_transform = y_inv_transform
 
     def update(self, x: np.ndarray, y: np.ndarray):
         # update rule stolen from
         # https://scaron.info/blog/simple-linear-regression-with-online-updates.html
+        x = self.x_transform(x)
+        y = self.y_transform(y)
         self.dots += np.array(
             [
                 x.shape[0],
@@ -54,7 +66,7 @@ class SimpleLinearRegressor(OnlineModel):
         # TODO: maybe throw an exception
         assert self.intercept is not None and self.slope is not None
 
-        return self.intercept + self.slope * x
+        return self.y_inv_transform(self.intercept + self.slope * self.x_transform(x))
 
 
 class OnlinePredictionEnv:
