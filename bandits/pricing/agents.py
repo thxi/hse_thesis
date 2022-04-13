@@ -89,7 +89,7 @@ class SLRAgent(Agent):
 
         estimated_quantities = self.slr.predict(x=np.array(self.action_to_price))
         means = self.action_to_price * estimated_quantities
-        upper = np.sqrt(2 * np.log(self.t + 1) / (self.arm_to_num_pulls) + 1)
+        upper = np.sqrt(2 * np.log(self.t + 1) / (self.arm_to_num_pulls + 1))
         k = np.argmax(means + self.alpha * upper)
         # print(f"{means=}")
         # print(f"{estimated_quantities=}")
@@ -144,18 +144,20 @@ class AggregatingAgent(Agent):
         self.reset()
 
     def _choose_arm(self):
-        if self.explored_bandits < self.num_arms:
-            # not finished exploration phase
-            k = self.explored_bandits
-            return k
+        # if self.explored_bandits < self.num_arms:
+        #     # not finished exploration phase
+        #     k = self.explored_bandits
+        #     return k
 
-        # estimated_quantities = self.slr.predict(x=np.array(self.action_to_price))
-        # TODO: should predict multiple values in agg algorithm
-        # pass x to update_estimates
-        # estimated_quantities =
+        estimated_quantities = self.aggregating_algorithm.get_prediction(np.array(self.action_to_price))
+        # print(f"{estimated_quantities=}")
         means = self.action_to_price * estimated_quantities
-        upper = np.sqrt(2 * np.log(self.t + 1) / (self.arm_to_num_pulls) + 1)
+        upper = np.sqrt(2 * np.log(self.t + 1) / (self.arm_to_num_pulls + 1))
         k = np.argmax(means + self.alpha * upper)
+
+        # selected arm -> predict quantities for this arm
+        _ = self.aggregating_algorithm.get_prediction(np.array([self.action_to_price[k]]))
+
         # print(f"{means=}")
         # print(f"{estimated_quantities=}")
         # print(f"{self.arm_to_num_pulls=}")
@@ -174,9 +176,7 @@ class AggregatingAgent(Agent):
 
         self.history_prices.append(price)
         self.history_quantities.append(conversion)
-        # TODO: numpy conversion might be inefficient
-        # change python list to numpy arrays initially
-        self.slr.update(x=np.array([price]), y=np.array([conversion]))
+        self.aggregating_algorithm.update_estimates(x=np.array([price]), y=np.array([conversion]))
 
         self.arm_to_num_pulls[action] += 1
 

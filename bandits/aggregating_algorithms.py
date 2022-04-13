@@ -15,11 +15,13 @@ class AggregatingAlgorithm(ABC):
     def get_prediction(self, x: np.ndarray) -> float:
         # x shape is (n_observations,)
 
+        # print(f"predicting for {x=}")
         all_predictions = []
         for model in self.models:
             model_predictions = model.predict(x)
             all_predictions.append(model_predictions)
         all_predictions = np.array(all_predictions).T  # shape=(n_observations, num_models)
+        # print(f"{all_predictions=}")
         self.previous_predictions = all_predictions
 
         final_prediction = self._get_final_prediction(all_predictions)
@@ -81,3 +83,7 @@ class Hedge(AggregatingAlgorithm):
         losses = np.sum(np.apply_along_axis(lambda x: self.loss_func(x, y), 0, self.previous_predictions), axis=0)
         self.weights = self.weights * np.exp(-self.eta * losses)
         self.weights = self.weights / np.sum(self.weights)
+        # print(x.shape, y.shape)
+        # print(self.previous_predictions.shape)
+        # print()
+        # print(f"{losses=}")
