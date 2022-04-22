@@ -1,11 +1,11 @@
 import numpy as np
 from gym import Env, spaces
 
-from bandits.bandits import BernoulliBanditEnv
+from bandits.bandits import BinomialBanditEnv
 
 
 class PricingBernoulliBanditEnv(Env):
-    def __init__(self, num_arms, dist, p_min=1, p_max=17):
+    def __init__(self, num_arms, dist, p_min=1, p_max=17, n_customers=100):
         super(PricingBernoulliBanditEnv, self).__init__()
 
         self.num_arms = num_arms
@@ -18,7 +18,7 @@ class PricingBernoulliBanditEnv(Env):
 
         self.action_to_price = np.linspace(p_min, p_max, num_arms)
         self.mus = 1 - dist.cdf(self.action_to_price)
-        self.b_bandit = BernoulliBanditEnv(probs=self.mus)
+        self.b_bandit = BinomialBanditEnv(n=n_customers, probs=self.mus)
 
         self.max_reward = np.max(self.mus * self.action_to_price)
 

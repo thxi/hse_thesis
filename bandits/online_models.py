@@ -5,7 +5,7 @@ import numpy as np
 
 class OnlineModel(ABC):
     @abstractmethod
-    def update(self, x: np.ndarray, y: np.ndarray):
+    def update_estimates(self, x: np.ndarray, y: np.ndarray):
         # updates the estimates of the model
         pass
 
@@ -19,11 +19,27 @@ class ConstantModel(OnlineModel):
     def __init__(self, constant):
         self.constant = constant
 
-    def update(self, x: np.ndarray, y: np.ndarray):
+    def update_estimates(self, x: np.ndarray, y: np.ndarray):
         pass
 
     def predict(self, x: np.ndarray) -> np.ndarray:
         return np.zeros(shape=(x.shape[0],)) + self.constant
+
+
+class PastObservationsModel(OnlineModel):
+    def __init__(self, answer_func, initial_prediction=0):
+        # answer func receives a vector of past observations [y1, y2, ..., y_t]
+        # and outputs the reponse y_t+1
+        self.answer_func = answer_func
+        self.y = np.array([])
+        self.next_prediction = initial_prediction
+
+    def update_estimates(self, x: np.ndarray, y: np.ndarray):
+        self.y = np.hstack([self.y, y])
+        self.next_prediction = self.answer_func(self.y)
+
+    def predict(self, x: np.ndarray) -> np.ndarray:
+        return np.repeat(self.next_prediction, x.shape[0])
 
 
 class SimpleLinearRegressor(OnlineModel):
@@ -42,7 +58,7 @@ class SimpleLinearRegressor(OnlineModel):
         self.y_transform = y_transform
         self.y_inv_transform = y_inv_transform
 
-    def update(self, x: np.ndarray, y: np.ndarray):
+    def update_estimates(self, x: np.ndarray, y: np.ndarray):
         # update rule stolen from
         # https://scaron.info/blog/simple-linear-regression-with-online-updates.html
         x = self.x_transform(x)
