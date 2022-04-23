@@ -10,3 +10,4 @@ __pycache__
 
 data/*
 !data/.gitkeep
+!data/avocado_lgbm_model.txt
