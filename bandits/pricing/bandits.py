@@ -1,6 +1,6 @@
 import lightgbm as lgb
-import pandas as pd
 import numpy as np
+import pandas as pd
 from gym import Env, spaces
 
 from bandits.bandits import BinomialBanditEnv
