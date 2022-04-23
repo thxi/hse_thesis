@@ -1,4 +1,5 @@
 from ctypes import ArgumentError
+
 import numpy as np
 
 from bandits.agents import Agent

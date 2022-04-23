@@ -1,3 +1,5 @@
+import logging
+import traceback
 from abc import ABC, abstractmethod
 from typing import List
 
@@ -108,16 +110,31 @@ class AdaHedge(AggregatingAlgorithm):
 
     def _update_weights(self, x: np.ndarray, y: np.ndarray):
         # print(x, y)
-        losses = np.sum(np.apply_along_axis(lambda x: self.loss_func(x, y), 0, self.previous_predictions), axis=0)
-        eta = np.log(self.num_models) / self.Delta if self.Delta != 0 else 1
-        eta = np.min([eta, 1])
-        h = self.weights.dot(losses)
-        m = -1 / eta * np.log(self.weights.dot(np.exp(-eta * losses)))
-        delta = h - m
-        self.Delta += delta
-        self.L += losses
-        self.weights = np.exp(-eta * self.L)
-        self.weights = self.weights / np.sum(self.weights)
+        try:
+            old = np.seterr(all="raise")
+            losses = np.sum(np.apply_along_axis(lambda x: self.loss_func(x, y), 0, self.previous_predictions), axis=0)
+            eta = np.log(self.num_models) / self.Delta if not (np.isclose(self.Delta, 0)) else 1
+            eta = np.min([eta, 1])
+            h = self.weights.dot(losses)
+            m = -1 / eta * np.log(self.weights.dot(np.exp(-eta * losses)))
+            delta = h - m
+            self.Delta += delta
+            self.L += losses
+            self.weights = np.exp(-eta * self.L)
+            self.weights = self.weights / np.sum(self.weights)
+        except Exception as e:
+            print(traceback.format_exc())
+            print(e)
+            print("losses", losses)
+            print("eta", eta)
+            print("Delta", self.Delta)
+            print("h", h)
+            print("m", m)
+            print("delta", delta)
+            print()
+            raise NotImplementedError("just erroring")
+        finally:
+            np.seterr(**old)
 
 
 class MultiplicativeWeights(AggregatingAlgorithm):

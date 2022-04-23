@@ -3,10 +3,6 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 
-# some code is taken from
-# https://towardsdatascience.com/multi-armed-bandits-upper-confidence-bound-algorithms-with-python-code-a977728f0e2d
-
-
 class Agent(ABC):
     @abstractmethod
     def get_action(self, observation):
