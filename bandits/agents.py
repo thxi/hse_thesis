@@ -62,7 +62,7 @@ class UCB1Agent(Agent):
 
         # selecting based on upper confidence bound
         means = self.arm_to_mean_rewards
-        upper = np.sqrt(2 * np.log(self.t + 1) / (self.arm_to_num_pulls + 1))
+        upper = np.sqrt(2 * np.log(self.t) / (self.arm_to_num_pulls))
         k = np.argmax(means + self.alpha * upper)
         return k
 

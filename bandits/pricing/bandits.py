@@ -1,3 +1,5 @@
+import itertools
+
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
@@ -18,6 +20,7 @@ class PricingBernoulliBanditEnv(Env):
         self.action_space = spaces.Discrete(num_arms)
         self.observation_space = spaces.Discrete(1)  # no observations, only rewards
 
+        # normalize the prices to [0, 1]
         self.action_to_price = np.linspace(p_min, p_max, num_arms)
         self.mus = 1 - dist.cdf(self.action_to_price)
         self.b_bandit = BinomialBanditEnv(n=n_customers, probs=self.mus)
@@ -83,7 +86,7 @@ def featurize(df):
 
 
 class PricingAvocadoBanditEnv(Env):
-    def __init__(self, num_arms, avocado_df, region, start_date, model_path="../data/avocado_lgbm_model.txt"):
+    def __init__(self, num_arms, avocado_df, region, start_date, model_path="../data/avocado_lgbm_model.txt", T=10000):
         super(PricingAvocadoBanditEnv, self).__init__()
 
         self.num_arms = num_arms
@@ -104,14 +107,10 @@ class PricingAvocadoBanditEnv(Env):
         self.action_to_price = np.linspace(self.p_min, self.p_max, num_arms)
         self.max_reward = np.max(self.action_to_price)
 
-    def step(self, action):
-        assert self.action_space.contains(action)
-
-        # make a prediction
-        price = self.action_to_price[action]
-        predict_df = pd.DataFrame([price], index=["price"]).T
-        predict_df["date"] = self.current_date
-        predict_df["region"] = self.region
+        end_date = start_date + pd.Timedelta(T - 1, unit="D")
+        dates = pd.date_range(start=start_date, end=end_date)
+        predict_df = pd.DataFrame(list(itertools.product(self.action_to_price, dates)), columns=["price", "date"])
+        predict_df["region"] = region
         featurize(predict_df)
         cols_to_categorical(predict_df, categorical_columns)
         predict_df["quantity_without_noise"] = self.model.predict(predict_df[model_cols])
@@ -119,9 +118,16 @@ class PricingAvocadoBanditEnv(Env):
         predict_df["quantity"] = predict_df["quantity_without_noise"] + e
         predict_df["quantity_norm"] = predict_df["quantity"] / self.quantity_norm
 
-        self.current_date += pd.Timedelta(1, unit="D")
+        self.predict_df = predict_df
+
+    def step(self, action):
+        assert self.action_space.contains(action)
+
+        price = self.action_to_price[action]
+        mask = (self.predict_df["date"] == self.current_date) & (np.isclose(self.predict_df["price"], price))
         observation = 0
-        conversion_reward = predict_df["quantity_norm"].iloc[0]
+        conversion_reward = self.predict_df[mask]["quantity_norm"].iloc[0]
+        self.current_date += pd.Timedelta(1, unit="D")
         done = False
         info = None
         price = self.action_to_price[action]

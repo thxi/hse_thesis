@@ -152,9 +152,9 @@ class AggregatingAgent(Agent):
 
         estimated_quantities = self.aggregating_algorithm.predict(np.array(self.action_to_price))
         # print(f"{estimated_quantities=}")
-        means = self.action_to_price * estimated_quantities
+        means = estimated_quantities
         upper = np.sqrt(2 * np.log(self.t + 1) / (self.arm_to_num_pulls + 1))
-        k = np.argmax(means + self.alpha * upper)
+        k = np.argmax(self.action_to_price * (means + self.alpha * upper))
 
         # selected arm -> predict quantities for this arm
         _ = self.aggregating_algorithm.predict(np.array([self.action_to_price[k]]))
