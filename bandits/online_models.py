@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections import defaultdict
 
 import numpy as np
 
@@ -83,6 +84,27 @@ class SimpleLinearRegressor(OnlineModel):
         assert self.intercept is not None and self.slope is not None
 
         return self.y_inv_transform(self.intercept + self.slope * self.x_transform(x))
+
+
+class TargetEncodingModel(OnlineModel):
+    def __init__(self):
+        self.x_to_sum_y = defaultdict(float)
+        self.x_to_num = defaultdict(int)
+
+    def update_estimates(self, x: np.ndarray, y: np.ndarray):
+        for i in range(len(x)):
+            self.x_to_sum_y[x[i]] += y[i]
+            self.x_to_num[x[i]] += 1
+
+    def predict(self, x: np.ndarray) -> np.ndarray:
+        predictions = []
+        for obs in x:
+            num_obs = self.x_to_num[obs]
+            num_obs = num_obs if num_obs != 0 else 1
+            prediction = self.x_to_sum_y[obs] / num_obs
+            predictions.append(prediction)
+        # print(predictions)
+        return np.array(predictions)
 
 
 class OnlinePredictionEnv:
