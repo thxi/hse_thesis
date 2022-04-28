@@ -66,68 +66,54 @@ def get_avocado_df(avocado_path):
     ]
     df = df[~df.region.isin(aggregated_regions)]
     region_to_volume = df.groupby(["region"]).quantity.sum().sort_values(ascending=False).reset_index()
-    good_regions = set(region_to_volume[:20].region) - set(["LosAngeles"])
+    good_regions = set(region_to_volume[:20].region) - set(["LosAngeles", "NewYork"])
     df = df[df.region.isin(good_regions)]
     return df
 
 
-categorical_columns = ["month", "region"]
-model_cols = ["price", "region", "year-month", "year", "month"]
-
-
-def cols_to_categorical(df, categorical_columns):
-    df[categorical_columns] = df[categorical_columns].astype("category")
-
-
-def featurize(df):
-    df["year-month"] = df["date"].dt.year * 100 + df["date"].dt.month
-    df["year"] = df["date"].dt.year
-    df["month"] = df["date"].dt.month
-
-
 class PricingAvocadoBanditEnv(Env):
-    def __init__(self, num_arms, avocado_df, region, start_date, model_path="../data/avocado_lgbm_model.txt", T=10000):
+    def __init__(
+        self,
+        num_arms,
+        avocado_df,
+        region,
+        start_date,
+        model_path="../data/avocado_lgbm_model.txt",
+        T=10000,
+        p_min=0.1,
+        p_max=1,
+    ):
         super(PricingAvocadoBanditEnv, self).__init__()
 
         self.num_arms = num_arms
         self.start_date = start_date
-        self.current_date = self.start_date
+        self.current_idx = 0
         self.region = region
         mm_prices = avocado_df[avocado_df.region == region].price.apply(["min", "max"])
-        self.p_min = mm_prices["min"]
-        self.p_max = mm_prices["max"]
-        self.q_std = avocado_df[avocado_df.region == region].quantity.std()
-        self.quantity_norm = avocado_df[avocado_df.region == region].quantity.max()
+        self.p_min_dataset = mm_prices["min"]
+        self.p_max_dataset = mm_prices["max"]
+        self.p_min_scale = p_min
+        self.p_max_scale = p_max
 
         self.model = lgb.Booster(model_file=model_path)
 
         self.action_space = spaces.Discrete(num_arms)
         self.observation_space = spaces.Discrete(1)  # no observations, only rewards
 
-        self.action_to_price = np.linspace(self.p_min, self.p_max, num_arms)
-        self.max_reward = np.max(self.action_to_price)
+        self.action_to_price = np.linspace(self.p_min_scale, self.p_max_scale, num_arms)
+        self.action_to_price_dataset = np.linspace(self.p_min_dataset, self.p_max_dataset, num_arms)
 
-        end_date = start_date + pd.Timedelta(T - 1, unit="D")
-        dates = pd.date_range(start=start_date, end=end_date)
-        predict_df = pd.DataFrame(list(itertools.product(self.action_to_price, dates)), columns=["price", "date"])
-        predict_df["region"] = region
-        featurize(predict_df)
-        cols_to_categorical(predict_df, categorical_columns)
-        predict_df["quantity_without_noise"] = self.model.predict(predict_df[model_cols])
-        e = np.random.normal(loc=0, scale=self.q_std)
-        predict_df["quantity"] = predict_df["quantity_without_noise"] + e
-        predict_df["quantity_norm"] = predict_df["quantity"] / self.quantity_norm
-
-        self.predict_df = predict_df
+        self._prepare_predict_df(avocado_df, T)
 
     def step(self, action):
         assert self.action_space.contains(action)
 
-        price = self.action_to_price[action]
-        mask = (self.predict_df["date"] == self.current_date) & (np.isclose(self.predict_df["price"], price))
+        price = self.action_to_price_dataset[action]
+        predict_df = self.price_to_predict_df[price]
         observation = 0
-        conversion_reward = self.predict_df[mask]["quantity_norm"].iloc[0]
-        self.current_date += pd.Timedelta(1, unit="D")
+        conversion_reward = predict_df.iloc[self.current_idx, :]["quantity_norm"]
+        # print(predict_df.iloc[self.current_idx, :])
+        self.current_idx += 1
         done = False
         info = None
         price = self.action_to_price[action]
@@ -136,3 +122,45 @@ class PricingAvocadoBanditEnv(Env):
 
     def reset(self):
         return 0
+
+    def _prepare_predict_df(self, avocado_df, T):
+        # Preparing the prediction dataframe from which the rewards will be drawn
+        # basically, just predicting the grid of [prices, dates]
+
+        def cols_to_categorical(df, categorical_columns):
+            df[categorical_columns] = df[categorical_columns].astype("category")
+
+        def featurize(df):
+            df["year-month"] = df["date"].dt.year * 100 + df["date"].dt.month
+            df["year"] = df["date"].dt.year
+            df["month"] = df["date"].dt.month
+
+        end_date = self.start_date + pd.Timedelta(T - 1, unit="D")
+        dates = pd.date_range(start=self.start_date, end=end_date)
+        predict_df = pd.DataFrame(
+            list(itertools.product(self.action_to_price_dataset, dates)),
+            columns=["price", "date"],
+        )
+        predict_df["region"] = self.region
+        featurize(predict_df)
+        categorical_columns = ["region"]
+        cols_to_categorical(predict_df, categorical_columns)
+        model_cols = ["price", "region"]
+        predict_df["quantity_without_noise"] = self.model.predict(predict_df[model_cols])
+        self.q_std = avocado_df[avocado_df.region == self.region].quantity.std()
+        self.quantity_norm = avocado_df[avocado_df.region == self.region].quantity.max()
+        e = np.random.normal(loc=0, scale=self.q_std, size=predict_df.shape[0]) / 5
+        predict_df["quantity"] = predict_df["quantity_without_noise"] + e
+        predict_df["quantity_norm"] = predict_df["quantity"] / self.quantity_norm
+        predict_df["quantity_norm"] = predict_df["quantity"] / self.quantity_norm
+        means = predict_df.groupby("price")["quantity_norm"].mean().reset_index()
+        means["mean_reward"] = means["quantity_norm"] * self.action_to_price
+        self.max_reward = np.max(means["mean_reward"])
+        self.predict_df = predict_df
+
+        # splitting the dataframe into slices based on prices
+        # would speed up the self.step() significantly
+        self.price_to_predict_df = {}
+        for p in self.action_to_price_dataset:
+            mask = np.isclose(self.predict_df["price"], p)
+            self.price_to_predict_df[p] = self.predict_df[mask]

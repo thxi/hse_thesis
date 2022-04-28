@@ -108,7 +108,6 @@ class AdaHedge(AggregatingAlgorithm):
         return final_prediction
 
     def _update_weights(self, x: np.ndarray, y: np.ndarray):
-        # print(x, y)
         try:
             old = np.seterr(all="raise")
             losses = np.sum(np.apply_along_axis(lambda x: self.loss_func(x, y), 0, self.previous_predictions), axis=0)
@@ -124,6 +123,7 @@ class AdaHedge(AggregatingAlgorithm):
         except Exception as e:
             print(traceback.format_exc())
             print(e)
+            print("L", self.L)
             print("losses", losses)
             print("eta", eta)
             print("Delta", self.Delta)
