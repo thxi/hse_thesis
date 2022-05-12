@@ -118,20 +118,27 @@ class AdaHedge(AggregatingAlgorithm):
             delta = h - m
             self.Delta += delta
             self.L += losses
-            self.weights = np.exp(-eta * self.L)
+            # have underflow here because some self.L are very huge
+            normalized_L = self.L - np.max(self.L)
+            normalized_L = np.clip(normalized_L, -100, 0)
+            self.weights = np.exp(-eta * normalized_L)
             self.weights = self.weights / np.sum(self.weights)
+            self.weights += 1e-16
         except Exception as e:
             print(traceback.format_exc())
             print(e)
-            print("L", self.L)
-            print("losses", losses)
-            print("eta", eta)
-            print("Delta", self.Delta)
-            print("h", h)
-            print("m", m)
-            print("delta", delta)
-            print()
-            raise NotImplementedError("just erroring")
+            info = {
+                "L": self.L,
+                "losses": losses,
+                "eta": eta,
+                "Delta": self.Delta,
+                "h": h,
+                "m": m,
+                "delta": delta,
+                "y": y,
+                "previous": self.previous_predictions,
+            }
+            raise NotImplementedError(f"just erroring: {info}")
         finally:
             np.seterr(**old)
 
